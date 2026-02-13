@@ -13,7 +13,8 @@ description: 创建和管理 Windows 计划任务定时提醒，包括编写异�
 - ✅ 创建一次性/循环定时任务
 - ✅ 编写异步执行的 bat 脚本（避免阻塞）
 - ✅ 配置 Discord Bridge `trigger_scheduled_task.py` 参数
-- ✅ 正确处理中文字符编码问题
+- ✅ 完美支持中文字符（UTF-8 配置文件）
+- ✅ 所有参数统一管理（配置文件集中管理）
 
 ## 快速开始
 
@@ -25,10 +26,11 @@ description: 创建和管理 Windows 计划任务定时提醒，包括编写异�
 - "5分钟后执行检查"
 
 **操作步骤：**
-1. 创建 bat 脚本（参考 [批处理脚本模板](#bat-脚本模板)）
-2. 使用 `schtasks` 命令创建任务
-3. 设置 `/sc once` 参数
+1. 创建任务文件夹和配置文件
+2. 创建 bat 脚本（只需指定配置文件路径）
+3. 使用 `schtasks` 命令创建任务
 4. 指定执行时间 `/st`
+5. 设置 `/sc once` 参数
 
 **示例：一分钟后执行**
 ```bash
@@ -43,48 +45,113 @@ schtasks /create /tn "任务名称" /tr "D:\path\to\script.bat" /st (Get-Date).A
 - "每周一备份数据"
 
 **操作步骤：**
-1. 创建 bat 脚本（确保异步执行）
-2. 使用 `schtasks` 命令创建任务
-3. 设置 `/sc daily` / `/sc hourly` / `/sc weekly`
-4. 指定具体时间参数
+1. 创建任务文件夹和配置文件
+2. 创建 bat 脚本
+3. 使用 `schtasks` 命令创建任务
+4. 设置 `/sc daily` / `/sc hourly` / `/sc weekly`
+5. 指定具体时间参数
 
 **示例：每天上午9点执行**
 ```bash
 schtasks /create /tn "任务名称" /tr "D:\path\to\script.bat" /st 09:00 /sc daily /f
 ```
 
+## 配置文件方式
+
+### 配置文件格式
+
+**文件位置：** `任务名\任务名_config.txt`
+
+**标准格式（ini 风格）：**
+```ini
+# 橘子提醒配置文件
+# 参数说明：
+# - username: 用户名
+# - content: 消息内容
+# - user_id: Discord 用户 ID（私聊模式必填）
+# - channel_id: Discord 频道 ID（频道模式必填）
+# - tag: 消息标签（reminder 或 task）
+
+username=
+content=
+user_id=
+channel_id=
+tag=
+```
+
+**支持的参数：**
+
+| 参数 | 说明 | 必填 | 示例 |
+|------|------|------|------|
+| `username` | 用户名 | ✅ | `鸵鸟居士` |
+| `content` | 消息内容 | ✅ | `该去吃橘子了！🍊` |
+| `user_id` | Discord 用户 ID | * | `343968107292786691` |
+| `channel_id` | Discord 频道 ID | * | `1466858871720251425` |
+| `tag` | 消息标签 | ✅ | `reminder` 或 `task` |
+
+* 注：`user_id` 和 `channel_id` 必须二选一，不能同时为空或同时填写。
+
+**参数优先级：**
+- 必须使用配置文件参数
+- 在频道中创建的任务，必须在频道中发送
+- 在私聊中创建的任务，必须在私聊中发送
+
+**编码要求：**
+- 配置文件必须使用 **UTF-8 编码**
+
 ## Bat 脚本模板
 
-### ✅ 标准模板（Windows 计划任务专用）
+### 标准模板
 
-**Discord Bridge 提醒任务标准格式：**
+**极简版本（所有参数在配置文件）：**
 ```batch
 @echo off
-REM 1. 创建任务文件夹：D:\AgentWorkspace\scheduled-tasks\任务名\
-REM 2. 创建配置文件：任务名\任务名_config.txt（UTF-8 编码）写入中文内容
-REM 3. 使用 --config-file 参数读取
-python D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\任务名\任务名_config.txt" --user-id 343968107292786691 >> D:\AgentWorkspace\scheduled-tasks\任务名\任务名.log 2>&1
+REM ========================================
+REM 任务名称：橘子提醒
+REM 说明：所有参数由配置文件管理
+REM ========================================
+
+python "D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py" --config-file "D:\AgentWorkspace\scheduled-tasks\orange_reminder\orange_reminder_config.txt"
+
 exit /b 0
+```
+
+**调试版本（带日志）：**
+```batch
+@echo off
+REM ========================================
+REM 任务名称：橘子提醒
+REM 说明：添加日志输出
+REM ========================================
+
+python "D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py" --config-file "D:\AgentWorkspace\scheduled-tasks\orange_reminder\orange_reminder_config.txt" >> "D:\AgentWorkspace\scheduled-tasks\orange_reminder\orange_reminder.log" 2>&1
+pause
 ```
 
 **关键点：**
 - ⚠️ **使用绝对路径** - Windows 计划任务的工作目录可能不稳定
 - ⚠️ **避免中文字符在文件名中** - 会导致命令截断
-- ✅ **使用配置文件存储中文内容** - UTF-8 编码的 .txt 文件
+- ✅ **使用配置文件存储所有内容** - UTF-8 编码的 .txt 文件
 - ✅ **每个任务独立文件夹** - 清晰管理 bat、txt、log 三个文件
 - ✅ **日志重定向** - 方便调试和排查问题
 
-**通用模板（带注释）：**
-```batch
-@echo off
-REM 任务文件夹：D:\AgentWorkspace\scheduled-tasks\任务名\
-REM 1. 创建配置文件：任务名\任务名_config.txt（UTF-8 编码）
-REM 2. 使用绝对路径调用 Python 脚本
-REM 3. 使用 --config-file 参数读取配置文件
-python D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\任务名\任务名_config.txt" --user-id 343968107292786691 >> D:\AgentWorkspace\scheduled-tasks\任务名\任务名.log 2>&1
+### 文件夹结构规范
 
-REM 立即退出批处理文件
-exit /b 0
+**标准目录结构：**
+```
+D:\AgentWorkspace\scheduled-tasks\
+├── orange_reminder\
+│   ├── orange_reminder.bat          # 调用脚本
+│   ├── orange_reminder_config.txt    # 任务配置（UTF-8）
+│   └── orange_reminder.log            # 执行日志
+├── morning_reminder\
+│   ├── morning_reminder.bat
+│   ├── morning_reminder_config.txt
+│   └── morning_reminder.log
+└── bedtime_reminder\
+    ├── bedtime_reminder.bat
+    ├── bedtime_reminder_config.txt
+    └── bedtime_reminder.log
 ```
 
 **路径规范：**
@@ -96,164 +163,67 @@ exit /b 0
 - **日志文件**：`任务名\任务名.log`
 - **Python 脚本位置**：使用绝对路径 `D:\AgentWorkspace\discord-claude-bridge\`
 
-**示例结构：**
-```
-D:\AgentWorkspace\scheduled-tasks\
-├── brush_reminder\
-│   ├── brush_reminder.bat
-│   ├── brush_reminder_config.txt
-│   └── brush_reminder.log
-├── morning_reminder\
-│   ├── morning_reminder.bat
-│   ├── morning_reminder_config.txt
-│   └── morning_reminder.log
-└── bedtime_reminder\
-    ├── bedtime_reminder.bat
-    ├── bedtime_reminder_config.txt
-    └── bedtime_reminder.log
-```
-
-### ❌ 错误示例（会导致问题）
-
-```batch
-@echo off
-cd /d "D:\AgentWorkspace\discord-claude-bridge"
-start "" /min python trigger_scheduled_task.py "鸵鸟居士，该去刷牙了！🪥" --user-id 343968107292786691 >nul 2>&1
-exit /b 0
-```
-
-**问题：**
-- ❌ 使用相对路径 - Windows 计划任务的工作目录不可控
-- ❌ 使用 `start "" /min` - 可能导致路径解析错误
-- ❌ 中文和 emoji 在消息中 - 可能被截断破坏
-- ❌ 输出到 nul - 无法调试
-
-### ⚠️ 中文字符编码问题（重要）
-
-**问题现象：**
-Windows 计划任务执行时，包含中文字符的命令行可能被破坏：
-```
-'_task.py' is not recognized as an internal or external command
-'r_scheduled_task.py' is not recognized as an internal or external command
-```
-
-**❌ 失败的解决方案：**
-- 使用 `chcp 65001` 设置 UTF-8 代码页 - 无效
-- 使用环境变量传递中文 - 变量展开失败
-- 使用 `set /p` 从文件读取到变量 - 仍然失败
-
-**✅ 最终解决方案：配置文件方式**
-
-经过多次测试验证，最可靠的方法是**使用配置文件存储中文内容**，让 Python 脚本直接读取 UTF-8 编码的文件。
-
-**文件结构：**
-```
-D:\AgentWorkspace\scheduled-tasks\
-├── brush_reminder\
-│   ├── brush_reminder.bat          # 调用脚本
-│   ├── brush_reminder_config.txt    # 中文消息内容（UTF-8）
-│   └── brush_reminder.log            # 执行日志
-```
-
-**步骤 1：创建任务文件夹**
-```bash
-mkdir "D:\AgentWorkspace\scheduled-tasks\任务名"
-```
-
-**步骤 2：创建配置文件（UTF-8 编码）**
-```
-D:\AgentWorkspace\scheduled-tasks\任务名\任务名_config.txt 内容：
-鸵鸟居士，该去刷牙了！🪥
-```
-
-**步骤 3：创建批处理脚本**
-```batch
-@echo off
-python D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\任务名\任务名_config.txt" --user-id 343968107292786691 >> D:\AgentWorkspace\scheduled-tasks\任务名\任务名.log 2>&1
-exit /b 0
-```
-
-**步骤 3：Python 脚本支持（已实现）**
-
-`trigger_scheduled_task.py` 已支持 `--config-file` 参数：
-- **`--config-file <文件路径>`** - 从 UTF-8 文件读取消息内容（必须使用）
-- **`content` 参数** - 直接传递消息内容（已废弃，不推荐）
-
-**优势：**
-- ✅ 无需 `chcp` 编码设置
-- ✅ 无需环境变量传递
-- ✅ Python 直接读取 UTF-8 文件
-- ✅ 完美支持中文、emoji 和特殊字符
-- ✅ 经过实测验证稳定可靠
-
 ## Discord Bridge 参数配置
 
-### trigger_scheduled_task.py 参数
+### trigger_scheduled_task.py 参数说明
 
 **基本语法：**
 ```bash
-# 发送到私聊
-python trigger_scheduled_task.py --config-file "<配置文件路径>" --user-id <用户ID>
+# 使用配置文件（推荐，支持所有参数）
+python trigger_scheduled_task.py --config-file "<配置文件路径>"
 
-# 发送到频道
-python trigger_scheduled_task.py --config-file "<配置文件路径>" --channel-id <频道ID>
+# 使用命令行参数（高级用法）
+python trigger_scheduled_task.py --username "<用户名>" --user-id <用户ID> --tag reminder --content "消息内容"
 ```
 
-**常用参数：**
-- `--config-file <路径>` - 消息配置文件（必填，UTF-8 编码）
-- `--user-id <ID>` - 发送到指定用户私聊（与 --channel-id 二选一）
-- `--channel-id <ID>` - 发送到指定频道（与 --user-id 二选一）
-- `--message <文本>` - 附加文本消息（可选）
-- `--direction TO_CLAUDE|TO_USER` - 消息方向（默认：TO_CLAUDE）
+**重要提示：**
+- 推荐使用配置文件方式，完美支持中文
+- 命令行参数可覆盖配置文件中的对应参数
+- 私聊模式需要用户ID，频道模式需要频道ID
+
+**命令行参数（可覆盖配置文件）：**
+- `--config-file <路径>` - 消息配置文件（使用配置方式时必填）
+- `--username <用户名>` - 用户名（可从配置文件读取）
+- `--user-id <ID>` - Discord 用户 ID（可从配置文件读取）
+- `--channel-id <ID>` - Discord 频道 ID（可从配置文件读取）
+- `--content <文本>` - 消息内容（可从配置文件读取）
+- `--tag <标签>` - 消息标签（可从配置文件读取）
 
 **发送目标说明：**
-- **私聊模式**（`--user-id`）：消息发送到指定用户的 Discord 私聊
-- **频道模式**（`--channel-id`）：消息发送到指定 Discord 频道
-- **必须二选一**：不能同时指定 --user-id 和 --channel-id
+- **私聊模式**（`user_id`）：消息发送到指定用户的 Discord 私聊
+- **频道模式**（`channel_id`）：消息发送到指定 Discord 频道
+- **必须二选一**：不能同时指定 user_id 和 channel_id
 
 **如何获取频道 ID：**
 1. 在 Discord 中开启开发者模式（设置 → 高级 → 开发者模式）
 2. 右键点击频道，选择"复制 ID"
 3. 频道 ID 格式类似：`1234567890123456789`
 
-**示例：**
-```batch
-REM ========== 发送到私聊 ==========
+**标签选择指南：**
+- **reminder** - 提醒类型（健康提醒、日程提醒、待办事项）
+- **task** - 任务类型（执行任务、检查状态、发送报告）
 
-REM 发送简单消息到私聊
-python trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\message\message_config.txt" --user-id 343968107292786691
+### 配置文件示例
 
-REM 发送带说明的消息到私聊
-python trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\message\message_config.txt" --user-id 343968107292786691 --message "请查收"
-
-REM ========== 发送到频道 ==========
-
-REM 发送消息到频道
-python trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\message\message_config.txt" --channel-id 1234567890123456789
-
-REM 发送带附件说明的消息到频道
-python trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\message\message_config.txt" --channel-id 1234567890123456789 --message "详情见附件"
-
-REM ========== 批处理脚本示例 ==========
-
-REM 私聊提醒任务（保存为 morning_reminder/morning_reminder.bat）
-@echo off
-REM 1. 创建任务文件夹：D:\AgentWorkspace\scheduled-tasks\morning_reminder\
-REM 2. 创建配置文件：morning_reminder\morning_reminder_config.txt（UTF-8 编码）写入中文内容
-REM 3. 使用 --config-file 参数读取
-python D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\morning_reminder\morning_reminder_config.txt" --user-id 343968107292786691 >> D:\AgentWorkspace\scheduled-tasks\morning_reminder\morning_reminder.log 2>&1
-exit /b 0
-
-REM 频道通知任务（保存为 channel_notify/channel_notify.bat）
-@echo off
-python D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\channel_notify\channel_notify_config.txt" --channel-id 1234567890123456789 >> D:\AgentWorkspace\scheduled-tasks\channel_notify\channel_notify.log 2>&1
-exit /b 0
+**私聊提醒示例：**
+```ini
+# 早上刷牙提醒
+username=鸵鸟居士
+content=早上好！该去刷牙了！🪥
+user_id=343968107292786691
+channel_id=
+tag=reminder
 ```
 
-**典型应用场景：**
-- **私聊提醒**：刷牙提醒、休息提醒、日程提醒等个人通知
-- **频道通知**：定时报告、系统状态、任务完成等群组广播
-- **混合使用**：重要通知同时发送到个人和频道
+**频道通知示例：**
+```ini
+# 每小时状态报告到频道
+username=系统机器人
+content=【系统状态报告】所有服务运行正常 ✅
+user_id=
+channel_id=1234567890123456789
+tag=task
+```
 
 ## Windows 计划任务工具参考
 
@@ -369,114 +339,131 @@ schtasks /query /v /tn "任务名称" | findstr "Last Run Time Last Result"
 - 检查批处理脚本是否可执行
 - 查看日志文件是否有错误信息
 - 确认路径是否使用绝对路径
+- 验证配置文件格式是否正确（key=value）
 
-**问题 2：中文字符被截断**
-- 改用英文消息内容
-- 检查日志文件确认截断情况
-- 使用绝对路径避免相对路径解析
+**问题 2：配置文件参数不生效**
+- 检查配置文件编码是否为 UTF-8
+- 确认参数格式：`key=value`（等号两边无空格）
+- 验证必填参数是否都提供：username、content、tag
+- 验证 user_id 或 channel_id 二选一
 
 **问题 3：计划任务创建失败**
 - 检查路径是否包含特殊字符
 - 确认批处理文件存在
 - 使用 `/f` 参数强制覆盖
+- 验证时间格式是否正确
+
+**问题 4：Python 脚本找不到**
+- 确认 Python 安装路径正确
+- 使用完整的 Python 可执行文件路径
+- 验证 `trigger_scheduled_task.py` 脚本路径存在
 
 ### 3. 测试流程
 
 **推荐测试步骤：**
 1. 先手动执行批处理脚本，确认功能正常
-2. 创建 1 分钟后执行的一次性任务测试
-3. 检查日志输出，确认无误
-4. 如果需要中文消息，测试通过后再使用
+2. 查看配置文件是否被正确读取
+3. 创建 1 分钟后执行的一次性任务测试
+4. 检查日志输出，确认无误
 5. 创建正式的生产任务
+6. 验证任务执行结果
 
 ## 完整示例
 
-### 示例：每小时发送状态报告
+### 示例 1：橘子提醒（私聊）
 
-**1. 创建任务文件夹和批处理文件：**
+**1. 创建任务文件夹：**
 ```bash
-# 创建文件夹
+mkdir "D:\AgentWorkspace\scheduled-tasks\orange_reminder"
+```
+
+**2. 创建配置文件（`orange_reminder_config.txt`）：**
+```ini
+# 橘子提醒配置文件
+username=鸵鸟居士
+content=鸵鸟居士，该去吃橘子了！🍊
+user_id=343968107292786691
+channel_id=
+tag=reminder
+```
+
+**3. 创建批处理文件（`orange_reminder.bat`）：**
+```batch
+@echo off
+python "D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py" --config-file "D:\AgentWorkspace\scheduled-tasks\orange_reminder\orange_reminder_config.txt" >> "D:\AgentWorkspace\scheduled-tasks\orange_reminder\orange_reminder.log" 2>&1
+pause
+```
+
+**4. 测试执行：**
+```bash
+# 手动运行 bat 文件测试
+"D:\AgentWorkspace\scheduled-tasks\orange_reminder\orange_reminder.bat"
+
+# 查看日志
+type "D:\AgentWorkspace\scheduled-tasks\orange_reminder\orange_reminder.log"
+```
+
+**5. 创建定时任务（每天下午2点）：**
+```bash
+schtasks /create /tn "每日橘子提醒" /tr "D:\AgentWorkspace\scheduled-tasks\orange_reminder\orange_reminder.bat" /st 14:00 /sc daily /f
+```
+
+### 示例 2：每小时状态报告（频道）
+
+**1. 创建任务文件夹：**
+```bash
 mkdir "D:\AgentWorkspace\scheduled-tasks\hourly_report"
 ```
 
-```batch
-@echo off
-REM 保存为：D:\AgentWorkspace\scheduled-tasks\hourly_report\hourly_report.bat
-REM 创建配置文件：hourly_report\hourly_report_config.txt（UTF-8 编码）
-python D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\hourly_report\hourly_report_config.txt" --user-id 343968107292786691 >> D:\AgentWorkspace\scheduled-tasks\hourly_report\hourly_report.log 2>&1
-exit /b 0
+**2. 创建配置文件（`hourly_report_config.txt`）：**
+```ini
+# 每小时状态报告配置
+username=系统机器人
+content=【系统状态报告】所有服务运行正常 ✅
+user_id=
+channel_id=1234567890123456789
+tag=task
 ```
 
-**2. 创建定时任务（每小时执行）：**
+**3. 创建批处理文件（`hourly_report.bat`）：**
+```batch
+@echo off
+python "D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py" --config-file "D:\AgentWorkspace\scheduled-tasks\hourly_report\hourly_report_config.txt" >> "D:\AgentWorkspace\scheduled-tasks\hourly_report\hourly_report.log" 2>&1
+pause
+```
+
+**4. 创建定时任务（每小时执行）：**
 ```bash
 schtasks /create /tn "每小时状态报告" /tr "D:\AgentWorkspace\scheduled-tasks\hourly_report\hourly_report.bat" /sc hourly /f
 ```
 
-**3. 验证：**
-```bash
-# 查看任务是否创建成功
-schtasks /query /tn "每小时状态报告"
+### 示例 3：明天上午9点早安提醒
 
-# 立即执行测试
-schtasks /run /tn "每小时状态报告"
-
-# 查看日志
-type D:\AgentWorkspace\scheduled-tasks\hourly_report\hourly_report.log
-```
-
-### 示例：明天上午9点发送提醒
-
-**1. 创建任务文件夹和批处理文件：**
+**1. 创建任务文件夹：**
 ```bash
 mkdir "D:\AgentWorkspace\scheduled-tasks\morning_reminder"
 ```
 
-```batch
-@echo off
-REM 保存为：D:\AgentWorkspace\scheduled-tasks\morning_reminder\morning_reminder.bat
-REM 创建配置文件：morning_reminder\morning_reminder_config.txt（UTF-8 编码）
-python D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\morning_reminder\morning_reminder_config.txt" --user-id 343968107292786691 >> D:\AgentWorkspace\scheduled-tasks\morning_reminder\morning_reminder.log 2>&1
-exit /b 0
+**2. 创建配置文件（`morning_reminder_config.txt`）：**
+```ini
+# 早安提醒配置
+username=鸵鸟居士
+content=早上好！美好的一天开始了！☀️
+user_id=343968107292786691
+channel_id=
+tag=reminder
 ```
 
-**2. 创建定时任务（明天上午9点）：**
+**3. 创建批处理文件（`morning_reminder.bat`）：**
+```batch
+@echo off
+python "D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py" --config-file "D:\AgentWorkspace\scheduled-tasks\morning_reminder\morning_reminder_config.txt" >> "D:\AgentWorkspace\scheduled-tasks\morning_reminder\morning_reminder.log" 2>&1
+pause
+```
+
+**4. 创建定时任务（明天上午9点）：**
 ```powershell
 schtasks /create /tn "早安提醒" /tr "D:\AgentWorkspace\scheduled-tasks\morning_reminder\morning_reminder.bat" /st 09:00 /sd (Get-Date).AddDays(1).ToString('yyyy/MM/dd') /sc once /f
-```
-
-**3. 验证：**
-```bash
-# 查看任务详情
-schtasks /query /v /tn "早安提醒"
-```
-
-### 示例：每天晚上10点发送休息提醒
-
-**1. 创建任务文件夹和批处理文件：**
-```bash
-mkdir "D:\AgentWorkspace\scheduled-tasks\bedtime_reminder"
-```
-
-```batch
-@echo off
-REM 保存为：D:\AgentWorkspace\scheduled-tasks\bedtime_reminder\bedtime_reminder.bat
-REM 创建配置文件：bedtime_reminder\bedtime_reminder_config.txt（UTF-8 编码）
-python D:\AgentWorkspace\discord-claude-bridge\trigger_scheduled_task.py --config-file "D:\AgentWorkspace\scheduled-tasks\bedtime_reminder\bedtime_reminder_config.txt" --user-id 343968107292786691 >> D:\AgentWorkspace\scheduled-tasks\bedtime_reminder\bedtime_reminder.log 2>&1
-exit /b 0
-```
-
-**2. 创建定时任务（每天晚上10点）：**
-```bash
-schtasks /create /tn "休息提醒" /tr "D:\AgentWorkspace\scheduled-tasks\bedtime_reminder\bedtime_reminder.bat" /st 22:00 /sc daily /f
-```
-
-**3. 验证和删除：**
-```bash
-# 立即执行测试
-schtasks /run /tn "休息提醒"
-
-# 不需要时删除任务
-schtasks /delete /tn "休息提醒" /f
 ```
 
 ## 最佳实践总结
@@ -484,8 +471,12 @@ schtasks /delete /tn "休息提醒" /f
 1. ✅ **每个任务独立文件夹** - 清晰管理 bat、txt、log 文件
 2. ✅ **使用绝对路径** - 避免工作目录问题
 3. ✅ **使用配置文件方式** - 完美支持中文和 emoji
-4. ✅ **添加日志输出** - 方便调试和排查
-5. ✅ **一次性任务测试** - 先验证再创建正式任务
-6. ✅ **使用 PowerShell 计算时间** - 动态时间更灵活
-7. ✅ **查看执行结果** - 确认任务成功执行
-8. ✅ **及时删除无用任务** - 保持系统整洁
+4. ✅ **所有参数集中管理** - 配置文件统一管理 username、content、user_id、channel_id、tag
+5. ✅ **添加日志输出** - 方便调试和排查
+6. ✅ **一次性任务测试** - 先验证再创建正式任务
+7. ✅ **使用 PowerShell 计算时间** - 动态时间更灵活
+8. ✅ **查看执行结果** - 确认任务成功执行
+9. ✅ **及时删除无用任务** - 保持系统整洁
+10. ✅ **正确使用 --tag 参数** - 根据事项性质选择 task 或 reminder 标签：
+   - 提醒类事项（健康提醒、日程提醒）使用 `tag=reminder`
+   - 任务类事项（执行脚本、发送报告）使用 `tag=task`
